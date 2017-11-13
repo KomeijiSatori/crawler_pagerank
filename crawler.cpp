@@ -23,7 +23,7 @@ int connections_req_num[MAX_CONNECTION];
 vector<pair<int, int> >url_conns;
 
 
-void RemoteReadCallback(struct evhttp_request* remote_rsp, void* arg);
+void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg);
 struct arg_pack
 {
 	int conn_id;
@@ -86,8 +86,8 @@ void deliver_request(const char *request_url, int source_url_id)
 	args->source_url_id = source_url_id;
 
 	struct evhttp_request *request = evhttp_request_new(RemoteReadCallback, args);
-    evhttp_add_header(evhttp_request_get_output_headers(request), "Host", host);
-    evhttp_make_request(connections[min_ind], request, EVHTTP_REQ_GET, request_url);
+	evhttp_add_header(evhttp_request_get_output_headers(request), "Host", host);
+	evhttp_make_request(connections[min_ind], request, EVHTTP_REQ_GET, request_url);
 }
 
 
@@ -111,7 +111,7 @@ bool judge_close()
 }
 
 
-void RemoteReadCallback(struct evhttp_request* remote_rsp, void* arg)
+void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg)
 {
 	int return_code = evhttp_request_get_response_code(remote_rsp);
 	struct arg_pack *args = (struct arg_pack *)arg;
@@ -161,12 +161,12 @@ void RemoteReadCallback(struct evhttp_request* remote_rsp, void* arg)
 	
 	if (judge_close())
 	{
-    	event_base_loopexit(base, NULL);
+		event_base_loopexit(base, NULL);
 	}
 }
 
 
-void RemoteConnectionCloseCallback(struct evhttp_connection* connection, void* arg)
+void RemoteConnectionCloseCallback(struct evhttp_connection *connection, void *arg)
 {
 
 }
@@ -194,8 +194,8 @@ int main(int argc, char *argv[])
 		connections_req_num[i] = 0;
 	}
 	
-    deliver_request(request_url, -1);
-    event_base_dispatch(base);
+	deliver_request(request_url, -1);
+	event_base_dispatch(base);
 	
 	// delete the first url_conn of root url
 	url_conns.erase(url_conns.begin());
