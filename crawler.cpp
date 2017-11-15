@@ -22,6 +22,8 @@ struct evhttp_connection *connections[MAX_CONNECTION];
 int connections_req_num[MAX_CONNECTION];
 vector<pair<string, string> > url_conns;
 
+int timeout_cnt = 0;
+
 
 void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg);
 struct arg_pack
@@ -32,6 +34,23 @@ struct arg_pack
 
 string cleaned_url(string url)
 {
+	// eliminate '\n' '\t' ' '
+	int blank_pos;
+	blank_pos = url.find("\n");
+	if (blank_pos != string::npos)
+	{
+		url = url.substr(0, blank_pos);	
+	}
+	blank_pos = url.find("\t");
+	if (blank_pos != string::npos)
+	{
+		url = url.substr(0, blank_pos);	
+	}
+	blank_pos = url.find(" ");
+	if (blank_pos != string::npos)
+	{
+		url = url.substr(0, blank_pos);	
+	}
 	// eliminate #
 	size_t pos = url.find("#");
 	if (pos != string::npos)
@@ -46,17 +65,140 @@ vector<string> get_page_urls(string page_str)
 {
 	vector<string> res;
 	set<string> all_url;
-	regex e("\"https?:\\/\\/news.sohu.com(.*?)\"");
-	smatch m;
-	while (regex_search(page_str, m, e))
+
+	int state = 0;
+	int start_ind = 0;
+	int end_ind = 0;
+	
+	for (int i = 0; i < page_str.length(); i++)
 	{
-		if (m[1].length() > 0)
+		char cur_ch = page_str[i];
+		if (state == 0)
 		{
-			string url = cleaned_url(m[1]);
-			all_url.insert(url);
+			if (cur_ch == '<')
+			{
+				state = 1;
+			}
 		}
-		page_str = m.suffix().str();
+		else if (state == 1)
+		{
+			if (cur_ch == 'a')
+			{
+				state = 2;
+			}
+			else
+			{
+				state = 0;
+			}
+		}
+		else if (state == 2)
+		{
+			if (cur_ch == 'h')
+			{
+				state = 3;
+			}
+			else if (cur_ch == '>')
+			{
+				state = 0;
+			}
+		}
+		else if (state == 3)
+		{
+			if (cur_ch == 'r')
+			{
+				state = 4;
+			}
+			else if (cur_ch == '>')
+			{
+				state = 0;
+			}
+			else
+			{
+				state = 2;
+			}
+		}
+		else if (state == 4)
+		{
+			if (cur_ch == 'e')
+			{
+				state = 5;
+			}
+			else if (cur_ch == '>')
+			{
+				state = 0;
+			}
+			else
+			{
+				state = 2;
+			}
+		}
+		else if (state == 5)
+		{
+			if (cur_ch == 'f')
+			{
+				state = 6;
+			}
+			else if (cur_ch == '>')
+			{
+				state = 0;
+			}
+			else
+			{
+				state = 2;
+			}
+		}
+		else if (state == 6)
+		{
+			if (cur_ch == '=')
+			{
+				state = 7;
+			}
+			else if (cur_ch == '>')
+			{
+				state = 0;
+			}
+			else
+			{
+				state = 2;
+			}
+		}
+		else if (state == 7)
+		{
+			if (cur_ch == '"')
+			{
+				// start record website
+				start_ind = i;
+				state = 8;
+			}
+			else if (cur_ch == '>')
+			{
+				state = 0;
+			}
+			else
+			{
+				state = 2;
+			}
+		}
+		else if (state == 8)
+		{
+			if (cur_ch == '"')
+			{
+				// end record website
+				end_ind = i;
+				string full_url = page_str.substr(start_ind + 1, end_ind - start_ind - 1);
+				string host = "news.sohu.com";
+				size_t found = full_url.find(host);
+				if (found != string::npos)
+				{
+					string url = full_url.substr(found + host.length());
+
+					all_url.insert(cleaned_url(url));
+				}
+				state = 0;
+			}
+		}
 	}
+
 	for (auto url:all_url)
 	{
 		res.push_back(url);
@@ -111,6 +253,13 @@ bool judge_close()
 
 void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg)
 {
+	// if timeout
+	if (remote_rsp == NULL)
+	{
+		timeout_cnt++;
+		return;
+	}
+
 	int return_code = evhttp_request_get_response_code(remote_rsp);
 	struct arg_pack *args = (struct arg_pack *)arg;
 
@@ -142,7 +291,6 @@ void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg)
 				all_urls[url] = all_urls.size();
 				deliver_request(url.c_str());
 			}
-			// int des_url_id = all_urls[url];
 			url_conns.push_back(pair<string, string>(cur_url, url));
 		}
 	}
@@ -188,6 +336,7 @@ int main(int argc, char *argv[])
 	event_base_dispatch(base);
 
 	cout << "crawl over" << endl;
+	cout << "timeout count: " << timeout_cnt << endl;
 	// eliminate non-200 urls
 	
 	vector<pair<int, int> > url_num_conns;
