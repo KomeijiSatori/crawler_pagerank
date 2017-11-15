@@ -20,14 +20,13 @@ const int MAX_CONNECTION = 100;
 struct event_base *base = NULL;
 struct evhttp_connection *connections[MAX_CONNECTION];
 int connections_req_num[MAX_CONNECTION];
-vector<pair<int, int> >url_conns;
+vector<pair<string, string> > url_conns;
 
 
 void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg);
 struct arg_pack
 {
 	int conn_id;
-	int source_url_id;
 };
 
 
@@ -66,7 +65,7 @@ vector<string> get_page_urls(string page_str)
 }
 
 
-void deliver_request(const char *request_url, int source_url_id)
+void deliver_request(const char *request_url)
 {
 	int min_conn = connections_req_num[0];
 	struct arg_pack *args = new struct arg_pack;
@@ -83,7 +82,6 @@ void deliver_request(const char *request_url, int source_url_id)
 
 	connections_req_num[min_ind]++;
 	args->conn_id = min_ind;
-	args->source_url_id = source_url_id;
 
 	struct evhttp_request *request = evhttp_request_new(RemoteReadCallback, args);
 	evhttp_add_header(evhttp_request_get_output_headers(request), "Host", host);
@@ -122,9 +120,7 @@ void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg)
 		
 		urls[cur_url] = urls.size();
 		int cur_id = urls[cur_url];
-		int source_id = args->source_url_id;
 
-		url_conns.push_back(pair<int, int>(source_id, cur_id));
 		cout << "size: " << urls.size() << endl;
 
 		char buf[4096];
@@ -138,22 +134,16 @@ void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg)
 			page_str += buf;
 		}
 
-		vector<string> res = get_page_urls(page_str);  
+		vector<string> res = get_page_urls(page_str); 
 		for (auto url:res)
 		{
 			if (all_urls.find(url) == all_urls.end())
 			{
 				all_urls[url] = all_urls.size();
-				deliver_request(url.c_str(), cur_id);
+				deliver_request(url.c_str());
 			}
-			else
-			{
-				if (urls.find(url) != urls.end())
-				{
-					int des_url_id = urls[url];
-					url_conns.push_back(pair<int, int>(cur_id, des_url_id));
-				}
-			}
+			// int des_url_id = all_urls[url];
+			url_conns.push_back(pair<string, string>(cur_url, url));
 		}
 	}
 	
@@ -184,7 +174,7 @@ int main(int argc, char *argv[])
 
 
 	const char *request_url = "/";
-	all_urls[request_url] = 0;
+	all_urls[request_url] = all_urls.size();
 
 	base = event_base_new();
 	for (int i = 0; i < MAX_CONNECTION; i++)
@@ -194,19 +184,29 @@ int main(int argc, char *argv[])
 		connections_req_num[i] = 0;
 	}
 	
-	deliver_request(request_url, -1);
+	deliver_request(request_url);
 	event_base_dispatch(base);
+
+	cout << "crawl over" << endl;
+	// eliminate non-200 urls
 	
-	// delete the first url_conn of root url
-	url_conns.erase(url_conns.begin());
+	vector<pair<int, int> > url_num_conns;
+	for (auto const &x : url_conns)
+	{
+		// if is 200 url connections
+		if (urls.find(x.first) != urls.end() && urls.find(x.second) != urls.end())
+		{
+			url_num_conns.push_back(pair<int, int>(urls[x.first], urls[x.second]));
+		}
+	}
 
 	ofstream out(file_name);
-	for (auto const& x : urls)
+	for (auto const &x : urls)
 	{
 		out << x.first << " " << x.second << endl;
 	}
 	out << endl;
-	for (auto const &x : url_conns)
+	for (auto const &x : url_num_conns)
 	{
 		out << x.first << " " << x.second << endl;
 	}
