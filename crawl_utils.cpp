@@ -98,7 +98,7 @@ void RemoteReadCallback(struct evhttp_request *remote_rsp, void *arg)
 			page_str += buf;
 		}
 
-		vector<string> res = get_page_urls(page_str); 
+		vector<string> res = get_page_urls(page_str, cur_url); 
 		for (auto url:res)
 		{
 			if (!in_set(url))
