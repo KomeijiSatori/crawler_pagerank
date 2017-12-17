@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
 				int id;
 				string url;
 				istringstream ins(str);
-				ins >> url >> id;
+				ins >> id >> url;
 				url_dict[id] = url;
 			}
 			else

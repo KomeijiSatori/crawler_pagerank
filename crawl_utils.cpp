@@ -163,14 +163,15 @@ int crawl(char *para_host, int para_port, char *para_file_name)
 
 	// output the results
 	ofstream out(para_file_name);
+	string host_name = "http://news.sohu.com";
 	for (auto const &x : urls)
 	{
-		out << x.first << " " << x.second << endl;
+		out << x.second - 1 << " " << host_name + x.first << endl;
 	}
 	out << endl;
 	for (auto const &x : url_num_conns)
 	{
-		out << x.first << " " << x.second << endl;
+		out << x.first - 1 << " " << x.second - 1 << endl;
 	}
 	out.close();
 	return timeout_cnt;
